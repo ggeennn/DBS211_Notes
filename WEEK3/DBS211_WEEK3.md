@@ -409,8 +409,8 @@
 
 #### DECODE 函数
 - **定义** | Definition
-  - `DECODE` 函数用于在 SQL 中实现条件逻辑。
-  - The `DECODE` function is used to implement conditional logic in SQL.
+  - `DECODE` 函数用于在 SQL 中实现条件逻辑，类似于编程语言中的 `switch` 语句。
+  - The `DECODE` function is used to implement conditional logic in SQL, similar to the `switch` statement in programming languages.
 - **示例** | Example
   ```sql
   SELECT employee_id, 

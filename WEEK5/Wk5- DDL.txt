@@ -1,0 +1,38 @@
+﻿--Student and course relationship
+--they have many to many relationship
+-- we need a bridge table-- enroll
+-- default constraint names -- Sys_Cn
+-- what is the differnce between unique and primary key constraints
+-- column level constraint given write after column
+CREATE TABLE student
+(stid number(9) primary key,
+lasname varchar2(30) not null,
+firstname varchar2(30) not null,
+email varchar2(35) not null unique
+);
+DESC STUDENT;
+ALTER TABLE STUDENT MODIFY (LASNAME VARCHAR2(40));
+create table course
+(course_id char(6) PRIMARY KEY,
+coursename varchar2(45) not null
+);
+
+-- COMPOSITE pk IS ALWAYS AT TABLE LEVEL
+--SYS_C001605407
+CREATE TABLE ENROLL
+(STID NUMBER(9) REFERENCES STUDENT(STID),
+COURSEID CHAR(6) REFERENCES COURSE,
+CONSTRAINT STID_CRSID_PK PRIMARY KEY(STID, COURSEID)
+);
+
+DESC ENROLL;
+
+ALTER TABLE ENROLL ADD (GRADE CHAR(1));
+ALTER TABLE ENROLL DROP COLUMN GRADE;
+
+ALTER TABLE ENROLL ADD CONSTRAINT CRSID_FK FOREIGN KEY (COURSEID) REFERENCES COURSE;
+ALTER TABLE ENROLL DROP CONSTRAINT SYS_C001605407;
+ALTER TABLE STUDENT DROP CONSTRAINT STID_FK;
+ALTER TABLE ENROLL DROP PRIMARY KEY;
+SELECT * FROM USER_CONSTRAINTS
+WHERE TABLE_NAME IN ('STUDENT', 'COURSE', 'ENROLL');

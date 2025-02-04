@@ -1,0 +1,160 @@
+﻿-- Section EE
+CREATE TABLE STUDENT
+(STID INT PRIMARY KEY ,
+LASTNAME VARCHAR(30) NOT NULL,
+firstname varchar(30) not null,
+EMAIL VARCHAR(30) NOT NULL UNIQUE,
+PHONE CHAR(10)
+);
+ALTER TABLE STUDENT DROP CONSTRAINT SYS_C001087109;
+
+ALTER TABLE STUDENT ADD CONSTRAINT STID_PK PRIMARY KEY(STID);
+insert into student values (123, 'John', 'Lin', 'Jlin', '2638712618');
+insert into student values (124, 'John', 'Kin', 'Jkin', '2638712619');
+select * from student;
+insert into student values (null, 'Kim', 'Lin', 'Klin', '2638712617');
+insert into student values (125, 'KiN', 'Jin', 'KJin', '2638712616');
+insert into student values (126, 'Jim', 'Tin', 'JTin', '2638712615');
+insert into student values (127, 'Julia', 'Ken', 'JKen', '2638712614');
+CREATE TABLE COURSE
+(COURSEID CHAR(6) PRIMARY KEY NOT NULL,
+COURSENAME VARCHAR(35) NOT NULL
+);
+SELECT * FROM COURSE;
+CREATE TABLE ENROLL
+( STID INT NOT NULL REFERENCES STUDENT,
+COURSECODE CHAR(6) NOT NULL REFERENCES COURSE,
+GRADE CHAR(1) DEFAULT 'A',
+CONSTRAINT STID_CRSID_PK PRIMARY KEY (STID, COURSECODE)
+);
+alter table enroll drop constraint stid_fk;
+ALTER TABLE ENROLL ADD CONSTRAINT STID_
+
+ALTER TABLE ENROLL DROP CONSTRAINT SYS_C001087139;
+ALTER TABLE ENROLL ADD CONSTRAINT STID_FK FOREIGN KEY (STID) REFERENCES STUDENT(STID)ON DELETE CASCADE;
+
+ALTER TABLE ENROLL ADD CONSTRAINT GRADE_CK CHECK (GRADE IN ('A','B','C','D','F'));
+
+INSERT INTO ENROLL VALUES (123, 'DBS211','A');
+INSERT INTO ENROLL VALUES (123, 'OOP244','A');
+INSERT INTO ENROLL VALUES (123, 'WEB222','A');
+INSERT INTO ENROLL VALUES (124, 'DBS211','A');
+INSERT INTO ENROLL VALUES (124, 'OOP244','B');
+INSERT INTO ENROLL VALUES (124, 'WEB222','C');
+
+SELECT * FROM ENROLL;
+INSERT INTO COURSE VALUES ('DBS211', 'DATA BASE DESIGN');
+INSERT INTO COURSE VALUES ('OOP244', 'C++');
+INSERT INTO COURSE VALUES ('WEB222', 'WEB DESIGN');
+SELECT * FROM STUDENT;
+SELECT * FROM COURSE;
+SELECT * FROM ENROLL;
+delete from student where stid = 123;
+DELETE FROM ENROLL WHERE STID = 123;
+DELETE FROM ENROLL WHERE STID = 124;
+rollback;
+
+select * from customers
+where customernumber = 237;
+select * from customers
+where customername = 'Atelier graphique';
+
+create index cus_name_idx on customers (customername);
+drop index cus_name_idx;
+rollback;
+ALTER TABLE ENROLL ADD MARKS NUMBER(5,2);
+SELECT * FROM ENROLL;
+ROLLBACK;
+ALTER TABLE ENROLL DROP COLUMN MARKS;
+
+SELECT * FROM STUDENT;
+SELECT * FROM COURSE;
+SELECT * FROM ENROLL;
+
+-- Transaction, we do not need begin or start like in other DBMS
+insert into student values (123, 'John', 'Lin', 'Jlin', '2638712618');
+INSERT INTO ENROLL VALUES (123, 'DBS211','A');
+INSERT INTO ENROLL VALUES (123, 'OOP244','A');
+INSERT INTO ENROLL VALUES (123, 'WEB222','A');
+update student set lastname = 'Kevin' where stid = 123;
+select * from student;
+select * from enroll;
+commit;
+
+-- FF
+CREATE TABLE STUDENT
+(STID int primary key not null,
+LastName varchar(30) not null,
+FirstName varchar(30) not null,
+email varchar(30) not null unique,
+phone char(10)  
+);
+ 
+ Alter table student drop constraint SYS_C001080203;
+ 
+ Alter table student add constraint stid_pk primary key (stid);
+ -- Primary key is added at column level
+ Create table course
+ (course_id char(6) constraint crs_id_pk primary key not null,
+ course_name varchar(35)not null
+ );
+ 
+ -- Primary Key is composite. Therefore, it has to be added at table level. 
+ --Meaning after all the columns are declared then we add PK.
+ create table enroll
+ (stid int not null references student,
+ courseid char(6) not null references course,
+ grade char(1) default 'A',
+ constraint stid_crsid_pk primary key (stid, courseid)
+ );
+ 
+ Alter table enroll drop constraint stid_fk;
+ ALTER TABLE ENROLL ADD CONSTRAINT STID_FK FOREIGN KEY (STID) REFERENCES STUDENT(STID) ON DELETE CASCADE;
+ 
+ insert into student values(123, 'John', 'Lin', 'Jlin', '4165558888');
+ insert into student values(124, 'John', 'Kin', 'Jkin', '4165558889');
+ 
+ SELECT * FROM STUDENT;
+ SELECT * FROM COURSE;
+ SELECT * FROM ENROLL;
+ 
+ delete from student where stid = 123;
+  ROLLBACK;
+ delete from enroll where stid = 123;
+ 
+ drop table student;
+ ROLLBACK;
+ insert into student values (123, 'John', 'Lin', 'Jlin', '2638712618');
+ INSERT INTO ENROLL VALUES (123, 'DBS211','A');
+INSERT INTO ENROLL VALUES (123, 'OOP244','A');
+INSERT INTO ENROLL VALUES (123, 'WEB222','A');
+ commit;
+ delete from student where stid = 123;
+  ROLLBACK;
+  
+  select * from enroll;
+  desc enroll;
+  ALTER TABLE ENROLL ADD MARKS NUMBER(5,2);
+  ROLLBACK;
+  ALTER TABLE ENROLL DROP COLUMN MARKS;
+  
+  insert into student values(125, 'Jim', 'Tin', 'Jtin', '4165557777');
+ insert into student values(126, 'Julia', 'Henry', 'Jhenry', '416555666');
+ insert into enroll values (126, 'DBS211', 'A');
+ update student set firstname = 'Jack' where stid = 125;
+ delete from student where stid = 126;
+ commit;
+ SELECT * FROM STUDENT;
+ SELECT * FROM COURSE;
+ SELECT * FROM ENROLL;
+ 
+ SELECT * FROM CUSTOMERS
+ where customernumber = 103;
+ 
+ SELECT * FROM CUSTOMERS
+ where customername = 'Atelier graphique';
+ 
+ DROP INDEX CUS_NAME_IDX;
+ CREATE INDEX CUS_NAME_IDX ON CUSTOMERS(CUSTOMERNAME);
+ 
+ 

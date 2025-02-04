@@ -1,0 +1,85 @@
+select * from employees;
+SELECT first_name
+|| ' earns '
+|| TO_CHAR(salary, 'fm$99,999.00')
+|| ' monthly and '
+|| NVL2(commission_pct, '%'
+|| TO_CHAR(commission_pct * 100)
+|| ' commission', 'no commission')
+|| ' to afford spending '
+|| TO_CHAR(salary/3, 'fm$99,999.00')
+|| ' on housing' AS "Housing Expenses"
+FROM employees;
+
+SELECT last_name ,
+TO_CHAR(hire_date, 'DAY, dd/mon/yy') "Hire Date",
+TO_CHAR(next_day(add_months(hire_date, 240), 'Friday'), 'fmDay, dd/Mon/yyyy') "20 years
+celebration"
+FROM employees;
+SELECT TO_CHAR(hire_date, 'fmDay, "the" Ddspth "of" Month, YYYY') "Day of Hire"
+FROM employees
+ORDER BY TO_CHAR(hire_date - 1, 'd');
+-- 4.
+SELECT last_name,
+DECODE(SUBSTR(phone_number,1,3), '515', 'A', 590, 'B', 603,'C', 650, 'D','E') region
+FROM employees
+ORDER BY region,
+
+phone_number;
+--5
+SELECT last_name,
+CASE SUBSTR(phone_number,1,3)
+WHEN '515'
+
+THEN 'A'
+
+WHEN '590'
+
+THEN 'B'
+
+WHEN '603'
+
+THEN 'C'
+
+WHEN '650'
+
+THEN 'D'
+
+ELSE 'E'
+END Region
+FROM employees
+ORDER BY region, phone_number;
+
+--6
+SELECT hire_date,
+DECODE(TO_CHAR(hire_date, 'YYYY'), '1995', 1, 0) "1995"
+FROM employees;
+--7
+SELECT SUBSTR(phone_number,1,3) "Area code" ,
+COUNT(*) "Count"
+FROM employees
+GROUP BY SUBSTR(phone_number,1,3)
+ORDER BY 1;
+--8
+SELECT COUNT(NVL(postal_code, 'X')) "Others"
+
+FROM locations
+WHERE NVL(SUBSTR(postal_code,1,1), 'X') NOT BETWEEN '0' AND '9';
+SELECT COUNT(*) FROM locations
+WHERE substr(upper(postal_code),1,1) BETWEEN 'A' AND 'Z' OR postal_code IS NULL;
+SELECT department_id,
+(MAX(salary) + MIN(salary)) / 2 "Mid salary"
+FROM employees
+GROUP BY department_id
+HAVING MIN(salary) > 5000
+AND department_id IS NOT NULL
+ORDER BY department_id;
+
+--10
+select department_id, sum(NVL2(commission_pct, 500, 1000)) "Total bonuses" from employees where
+department_id is not null group by department_id ;
+
+--11
+select department_name, street_address || ', ' || city || ', ' || state_province AS Address from
+departments natural join locations where city <> 'Seattle' order by department_name;
+

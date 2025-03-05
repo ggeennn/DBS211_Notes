@@ -1,4 +1,4 @@
-﻿--Student and course relationship
+--Student and course relationship
 --they have many to many relationship
 -- we need a bridge table-- enroll
 -- default constraint names -- Sys_Cn

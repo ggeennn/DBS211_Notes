@@ -457,6 +457,7 @@ ROLLBACK;                                 -- 必须中止
 
 ## 4. 并发控制 (Concurrency Control) 🟡
 
+### 4.1 锁机制方案
 ### Wait/Die 和 Wound/Wait 方案
 #### 1. Wait/Die 方案
 - **定义**: 在此方案中，如果一个事务请求锁而被阻塞，它将根据其时间戳决定是等待还是终止。
@@ -490,80 +491,104 @@ ROLLBACK;                                 -- 必须中止
    - 老事务可以抢占新事务的资源 ⚔️
    - 新事务只能等待老事务完成 ⏳
 
-### 银行转账场景
+### 4.2 事务隔离级别（锁视角）
 
-### 乐观并发控制 (Optimistic Concurrency Control) 🟢
-
-#### 三阶段工作流程 (Three-Phase Workflow)
-1. **读取阶段 (Read Phase)**
-   - 事务读取数据库并创建私有副本
-   - 示例银行转账场景：
-   ```sql
-   BEGIN TRANSACTION;
-   -- 读取账户A余额（假设原始余额为$1000）
-   SELECT balance INTO :old_balance FROM accounts WHERE id = 1;
-   -- 读取账户B余额（假设原始余额为$500）
-   SELECT balance INTO :old_balance2 FROM accounts WHERE id = 2;
-   ```
-
-2. **验证阶段 (Validation Phase)**
-   - 检查数据在读取后是否被修改
-   - 使用版本号或时间戳实现
-   ```sql
-   -- 检查账户A是否被修改
-   SELECT version FROM accounts WHERE id = 1;
-   -- 如果检测到版本号变化，则回滚事务
-   IF :current_version != :original_version THEN
-       ROLLBACK;
-   ELSE
-       -- 更新账户A
-       UPDATE accounts SET balance = 900, version = version + 1 WHERE id = 1;
-       -- 更新账户B
-       UPDATE accounts SET balance = 600, version = version + 1 WHERE id = 2;
-   END IF;
-   ```
-
-3. **写入阶段 (Write Phase)**
-   - 验证通过后提交更改
-   ```sql
-   COMMIT;
-   ```
-
-#### 验证规则 (Validation Rules)
-| 验证类型         | 检查内容                          | 适用场景               |
-|------------------|----------------------------------|----------------------|
-| 向后验证         | 与较早事务的冲突                 | 低并发环境           |
-| 向前验证         | 与较晚事务的冲突                 | 高并发环境           |
-
-#### 银行转账示例
-```sql
--- 阶段1：读取
-START TRANSACTION;
-SELECT balance, version INTO @a_balance, @a_version FROM accounts WHERE id = 1;
-SELECT balance, version INTO @b_balance, @b_version FROM accounts WHERE id = 2;
-
--- 阶段2：验证（伪代码逻辑）
-IF (CURRENT_VERSION(1) != @a_version OR CURRENT_VERSION(2) != @b_version) {
-    ROLLBACK;
-} ELSE {
-    UPDATE accounts SET balance = @a_balance - 100, version = version + 1 WHERE id = 1;
-    UPDATE accounts SET balance = @b_balance + 100, version = version + 1 WHERE id = 2;
-}
-
--- 阶段3：写入
-COMMIT;
+#### 隔离级别与锁的对应关系
+```mermaid
+flowchart TD
+    A[隔离级别] --> B[锁策略]
+    B --> C[锁定范围]
+    C --> D[允许的并发问题]
 ```
 
-#### 优缺点对比
-| **优势**                          | **劣势**                          |
-|-----------------------------------|-----------------------------------|
-| 无锁机制，高并发性能              | 需要维护版本字段                  |
-| 适合读多写少场景                  | 冲突时需要重试                    |
-| 避免死锁问题                      | 不保证第一次提交成功              |
-
-💡 实践提示：在账户表添加版本字段
+#### 锁粒度演进（以银行系统为例）
 ```sql
-ALTER TABLE accounts ADD version NUMBER DEFAULT 0;
+-- 账户表结构
+CREATE TABLE accounts (
+  acc_number VARCHAR(20) PRIMARY KEY,
+  balance DECIMAL(15,2),
+  last_updated TIMESTAMP
+);
+```
+
+| 隔离级别       | 锁定方式          | 锁定时机         | 示例场景                 | 类比           |
+|----------------|-------------------|------------------|--------------------------|----------------|
+| **读未提交**   | 无锁              | 无               | 大厅显示屏（实时总资产） | 开放式书架     |
+| **读已提交**   | 行级写锁（X锁）   | 写操作时         | ATM取款操作              | 图书馆单本书籍 |
+| **可重复读**   | 范围锁（Gap Lock）| 读操作时         | 月度对账单生成           | 整排书架       |
+| **串行化**     | 表级锁（S锁）     | 事务开始时       | 大额资金调拨             | 图书馆闭馆     |
+
+#### 不同级别下的锁表现实验
+**实验准备：**
+```sql
+-- 会话A
+START TRANSACTION;
+UPDATE accounts SET balance = 5000 WHERE acc_number = '62258801';
+
+-- 会话B在不同隔离级别下执行：
+SELECT * FROM accounts WHERE acc_number = '62258801';
+```
+
+| 隔离级别       | 会话B读取结果       | 锁状态                  | 现象解释                 |
+|----------------|---------------------|-------------------------|--------------------------|
+| 读未提交       | 立即返回5000        | 无锁                    | 读取到未提交数据（脏读） |
+| 读已提交       | 等待会话A提交       | 行级共享锁（S锁）       | 避免脏读                 |
+| 可重复读       | 返回原始值          | 范围共享锁（Gap Lock）  | 使用快照数据             |
+| 串行化         | 直接报错或等待      | 表级共享锁（S锁）       | 完全隔离                 |
+
+#### 锁类型详解
+1. **行级锁（Row Lock）**
+```sql
+-- 显式加行锁
+SELECT * FROM accounts 
+WHERE acc_number = '62258801'
+FOR UPDATE; -- X锁
+
+-- 查看锁信息
+SELECT * FROM V$LOCKED_OBJECT;
+```
+
+2. **间隙锁（Gap Lock）**
+```sql
+-- 锁定账户范围62258800-62258900
+SELECT * FROM accounts
+WHERE acc_number BETWEEN '62258800' AND '62258900'
+LOCK IN SHARE MODE; -- S锁
+```
+
+3. **表级锁（Table Lock）**
+```sql
+-- 锁定整个账户表
+LOCK TABLES accounts WRITE;
+```
+
+#### 工程实践建议
+| 场景                | 推荐级别      | 锁机制           | 风险控制                 |
+|---------------------|---------------|------------------|--------------------------|
+| 实时数据展示        | 读未提交      | 无锁             | 允许0.5-1秒数据延迟      |
+| 日常交易处理        | 读已提交      | 行级写锁         | 控制事务在200ms内完成    |
+| 财务审计            | 可重复读      | 范围锁+MVCC      | 使用历史快照             |
+| 清算结算            | 串行化        | 表级锁           | 夜间批量处理             |
+
+#### Oracle锁监控实战
+```sql
+-- 查看当前锁
+SELECT
+  l.session_id,
+  o.object_name,
+  DECODE(l.locked_mode,
+    2, 'Row-S (SS)',
+    3, 'Row-X (SX)',
+    4, 'Share',
+    5, 'S/Row-X (SSX)',
+    6, 'Exclusive',
+    'NONE'
+  ) lock_mode
+FROM v$locked_object l
+JOIN user_objects o ON l.object_id = o.object_id;
+
+-- 终止阻塞会话
+ALTER SYSTEM KILL SESSION 'sid,serial#';
 ```
 
 ## FAQ (常见问题) ❓
@@ -585,5 +610,88 @@ ALTER TABLE accounts ADD version NUMBER DEFAULT 0;
 3. 注意事务控制的使用场景
 4. 多做实践，特别是复杂的表关系设计
 5. 理解索引的作用和使用场景
+
+# 数据库恢复管理与事务隔离级别
+
+## 数据库恢复管理
+- **数据库恢复**: 将数据库从某个状态恢复到之前的一致状态。
+- **恢复事务**: 基于原子性事务属性，确保所有操作作为一个单一的逻辑工作单元处理。
+  - 如果事务操作无法完成：
+    - 事务必须被中止。
+    - 数据库的更改必须回滚。
+
+### 影响事务恢复的概念
+1. **预写日志协议 (Write-Ahead Log Protocol)**:
+   - 确保事务日志在数据更新之前始终被写入。
+
+2. **冗余事务日志 (Redundant Transaction Logs)**:
+   - 确保物理磁盘故障不会影响数据库管理系统（DBMS）恢复数据的能力。
+
+3. **缓冲区 (Buffers)**:
+   - 在主内存中的临时存储区域，用于提高性能。
+
+4. **检查点 (Checkpoints)**:
+   - 允许数据库管理系统将所有更新的缓冲区写入磁盘，以确保在发生故障时能够快速恢复。
+
+## 事务隔离级别
+| 隔离级别 | 允许的脏读 | 允许的不可重复读 | 允许的幻读 | 备注 |
+|-----------|-------------|------------------|-------------|------|
+| Read Uncommitted | 是 | 是 | 是 | 读取未提交的数据，允许脏读、不可重复读和幻读。 |
+| Read Committed | 否 | 是 | 是 | 不允许读取未提交的数据，但允许不可重复读和幻读。 |
+| Repeatable Read | 否 | 否 | 是 | 只允许幻读。 |
+| Serializable | 否 | 否 | 否 | 不允许脏读、不可重复读或幻读。 |
+
+### 关键概念
+- **脏读 (Dirty Read)**: 读取到其他事务未提交的数据。
+- **不可重复读 (Nonrepeatable Read)**: 同一事务内多次读取同一数据，结果不一致。
+- **幻读 (Phantom Read)**: 同一事务内，查询条件相同但结果集不同。
+
+### 选择建议
+- 默认使用 **Read Committed** 隔离级别，平衡安全性和性能。
+- 特殊情况使用 **Serializable** 隔离级别，确保数据一致性，但可能影响性能。
+
+# 事务恢复程序中的技术
+
+在数据库管理系统中，事务恢复是确保数据一致性和完整性的重要过程。以下是两种主要的事务恢复技术：
+
+## 1. 延迟写技术（Deferred-write technique 或 Deferred update）
+- **定义**：在这种技术中，只有事务日志被更新，而数据库本身并不立即更新。
+- **优点**：
+  - 提高了性能，因为数据库的写操作被延迟到事务提交时。
+  - 减少了对数据库的直接写入，降低了磁盘I/O操作。
+- **缺点**：
+  - 如果系统崩溃，未提交的事务可能会丢失。
+
+### 延迟写技术中的恢复过程
+1. **识别最后的检查点**：在事务日志中找到最后的检查点。
+2. **如果事务在最后检查点之前提交**：
+   - 不需要进行任何操作，因为检查点已经将数据持久化到磁盘。
+   - 事务日志中记录了该事务的提交信息，但不需要重做。
+3. **如果事务在最后检查点之后提交**：
+   - 必须重新执行该事务，因为检查点之后的数据可能尚未持久化。
+   - 事务日志是恢复的唯一依据，包含所有必要的操作记录。
+4. **如果事务在最后检查点之后有 ROLLBACK 操作**：
+   - 使用事务日志回滚操作，撤销所有更改。
+   - 事务日志中记录了回滚信息，确保数据一致性。
+
+## 2. 直写技术（Write-through technique 或 Immediate update）
+- **定义**：在这种技术中，数据库在事务执行期间立即更新。
+- **优点**：
+  - 数据库始终保持最新状态，减少了数据丢失的风险。
+  - 适用于需要实时数据的应用场景。
+- **缺点**：
+  - 增加了磁盘I/O操作，可能会影响性能。
+
+### 直写技术中的恢复过程
+1. **识别最后的检查点**：在事务日志中找到最后的检查点。
+2. **如果事务在最后检查点之前提交**：
+   - 不需要进行任何操作，因为检查点已经将数据持久化到磁盘。
+   - 事务日志中记录了该事务的提交信息，但不需要重做。
+3. **如果事务在最后检查点之后提交**：
+   - 必须重新执行该事务，因为检查点之后的数据可能尚未持久化。
+   - 事务日志是恢复的唯一依据，包含所有必要的操作记录。
+4. **如果事务在最后检查点之后有 ROLLBACK 操作**：
+   - 使用事务日志回滚操作，撤销所有更改。
+   - 事务日志中记录了回滚信息，确保数据一致性。
 
 [End of Document]
